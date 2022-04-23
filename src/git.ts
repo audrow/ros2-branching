@@ -10,8 +10,15 @@ export async function checkoutBranch(
   newBranch: string,
   currentBranch: string,
 ) {
-  const git = simpleGit(path)
-  await git.checkoutBranch(newBranch, currentBranch)
+  try {
+    const git = simpleGit(path)
+    await git.checkoutBranch(newBranch, currentBranch)
+  } catch (e) {
+    console.error(
+      `Failed to checkout branch '${newBranch}' from '${currentBranch}' in '${path}'`,
+    )
+    throw e
+  }
 }
 
 export async function push(path: string, branch: string, remote = 'origin') {
