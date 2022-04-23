@@ -63,6 +63,8 @@
     "@types/fs-extra": "^9.0.13",
     "fs-extra": "^10.1.0",
     "js-yaml": "^4.1.0",
+    "pino": "^7.10.0",
+    "pino-pretty": "^7.6.1",
     "simple-git": "^3.7.0",
     "temp-fs": "^0.9.9"
   }

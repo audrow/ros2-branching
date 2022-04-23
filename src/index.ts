@@ -11,6 +11,7 @@ import {
   setRepoVersion,
 } from './repos-file'
 import type ProcessedRepos from './__types__/ProcessedRepos'
+import logger from './logger'
 
 const DATA_PATH = join(__dirname, '..', 'data')
 const DISTRIBUTION_YAML_PATH = join(DATA_PATH, 'distribution.yaml')
@@ -39,19 +40,21 @@ async function run({
   srcCodePath: string
   outDirectoryPath: string
 }) {
+  logger.debug(`Loading repo and distribution files`)
   let repos = loadRepos(reposYamlPath)
   let distribution = loadDistribution(distributionYamlPath)
 
   if (!existsSync(srcCodePath)) {
     throw new Error(`Directory ${srcCodePath} does not exist`)
   }
+  logger.debug(`Setting up output directory: ${outDirectoryPath}`)
   if (existsSync(outDirectoryPath)) {
     rmSync(outDirectoryPath, {recursive: true})
   }
   mkdirSync(outDirectoryPath)
   const outSrcCodePath = join(outDirectoryPath, 'src')
+  logger.debug(`Copying ${srcCodePath} to ${outDirectoryPath}`)
   copySync(srcCodePath, outSrcCodePath)
-  //copy src dir into out dir
 
   const newBranch = 'humble'
   const checkBranch = 'galactic'
@@ -62,14 +65,15 @@ async function run({
       if (!(await hasBranch(repoPath, RegExp(newBranch)))) {
         const repoVersion = getRepo(repos, repo).version
         await checkoutBranch(repoPath, newBranch, repoVersion)
+        logger.debug(`Checked out ${repo}@${repoVersion}`)
       } else {
-        console.log(`Branch '${newBranch}' already exists in ${repoPath}`)
+        logger.debug(`Branch '${newBranch}' already exists in ${repoPath}`)
       }
 
       try {
         repos = setRepoVersion(repos, repo, newBranch)
       } catch (e) {
-        console.error(
+        logger.error(
           "Failed to set version for repo '%s' in ros2.repos file",
           repo,
         )
@@ -77,7 +81,7 @@ async function run({
       try {
         distribution = setDistributionVersion(distribution, repo, newBranch)
       } catch (e) {
-        console.error(
+        logger.error(
           "Failed to set version for repo '%s' in distribution file",
           repo,
         )
@@ -85,8 +89,9 @@ async function run({
       if (!isDryRun) {
         try {
           await push(repoPath, newBranch)
+          logger.debug(`Pushed branch '${newBranch}' to ${repoPath}`)
         } catch (e) {
-          console.error(
+          logger.error(
             "Failed to push branch '%s' to repo '%s'",
             newBranch,
             repo,
@@ -94,7 +99,7 @@ async function run({
         }
       }
     } else {
-      console.log(`No branch '${checkBranch}' found in ${repoPath}`)
+      logger.debug(`No branch '${checkBranch}' found in ${repoPath}`)
     }
   }
   const reposFile = reposToReposFile(repos)
@@ -105,6 +110,7 @@ async function run({
     distributionYamlSavePath,
     yaml.dump(distribution, {noArrayIndent: true}),
   )
+  logger.info(`Done! - created files in ${outDirectoryPath}`)
 }
 
 async function main() {
