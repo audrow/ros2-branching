@@ -29,7 +29,6 @@ describe('distribution-file', () => {
     expect(oldVersion).toBe('master')
     const newVersion = 'ultra-ros'
     const newDist = setDistributionVersion(dist, 'rclcpp', newVersion)
-    console.log(getFromDistribution(dist, 'rclcpp'))
     expect(getFromDistribution(dist, 'rclcpp').doc!.version).toBe(oldVersion)
     expect(getFromDistribution(dist, 'rclcpp').source!.version).toBe(oldVersion)
     expect(getFromDistribution(newDist, 'rclcpp').doc!.version).toBe(newVersion)
