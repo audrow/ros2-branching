@@ -4,6 +4,7 @@ import yaml from 'js-yaml'
 import {join} from 'path'
 import {loadDistribution, setDistributionVersion} from './distribution-file'
 import {checkoutBranch, hasBranch, push} from './git'
+import logger from './logger'
 import {
   getRepo,
   loadRepos,
@@ -11,7 +12,6 @@ import {
   setRepoVersion,
 } from './repos-file'
 import type ProcessedRepos from './__types__/ProcessedRepos'
-import logger from './logger'
 
 const DATA_PATH = join(__dirname, '..', 'data')
 const DISTRIBUTION_YAML_PATH = join(DATA_PATH, 'distribution.yaml')
