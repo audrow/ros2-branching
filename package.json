@@ -1,10 +1,7 @@
 {
-  "name": "node-ts-template",
+  "name": "ros2-branching",
   "version": "0.0.1",
-  "description": "A starting point for NodeJS Typescript projects.",
-  "main": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
-  "module": "dist/esm/index.js",
+  "description": "Prepare for a new ROS 2 branch",
   "source": "src/index.ts",
   "scripts": {
     "clean": "rm -rf dist",
@@ -14,8 +11,8 @@
     "format": "npm run prettier -- --write",
     "check-format": "npm run prettier -- --list-different",
     "test": "jest",
-    "validate-sync": "npm-run-all lint check-format test build",
-    "validate": "npm-run-all --parallel lint check-format test build"
+    "validate-sync": "npm-run-all lint check-format test",
+    "validate": "npm-run-all --parallel lint check-format test"
   },
   "files": [
     "dist"
@@ -61,6 +58,7 @@
   },
   "dependencies": {
     "@types/fs-extra": "^9.0.13",
+    "commander": "^9.2.0",
     "fs-extra": "^10.1.0",
     "js-yaml": "^4.1.0",
     "pino": "^7.10.0",

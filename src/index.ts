@@ -1,7 +1,9 @@
+import {Command} from 'commander'
 import {existsSync, mkdirSync, rmSync, writeFileSync} from 'fs'
 import {copySync} from 'fs-extra'
 import yaml from 'js-yaml'
 import {join} from 'path'
+import packageJson from '../package.json'
 import {loadDistribution, setDistributionVersion} from './distribution-file'
 import {checkoutBranch, hasBranch, push} from './git'
 import logger from './logger'
@@ -13,11 +15,14 @@ import {
 } from './repos-file'
 import type ProcessedRepos from './__types__/ProcessedRepos'
 
-const DATA_PATH = join(__dirname, '..', 'data')
-const DISTRIBUTION_YAML_PATH = join(DATA_PATH, 'distribution.yaml')
-const REPOS_YAML_PATH = join(DATA_PATH, 'ros2.repos')
-const SRC_CODE_PATH = join(DATA_PATH, 'src')
-const OUT_DIRECTORY_PATH = join(__dirname, '..', 'out')
+const DEFAULT_DATA_PATH = join(process.cwd(), 'data')
+const DEFAULT_DISTRIBUTION_YAML_PATH = join(
+  DEFAULT_DATA_PATH,
+  'distribution.yaml',
+)
+const DEFAULT_REPOS_YAML_PATH = join(DEFAULT_DATA_PATH, 'ros2.repos')
+const DEFAULT_SRC_CODE_PATH = join(DEFAULT_DATA_PATH, 'src')
+const DEFAULT_OUT_DIRECTORY_PATH = join(process.cwd(), 'out')
 
 function getRepoPath(dataPath: string, repos: ProcessedRepos, repo: string) {
   const repoData = getRepo(repos, repo)
@@ -27,14 +32,50 @@ function getRepoPath(dataPath: string, repos: ProcessedRepos, repo: string) {
   return join(dataPath, repoData.org, repo)
 }
 
+type ErrorLog = {
+  [repo: string]: string
+}
+
+function recordError({
+  error,
+  repo,
+  errorLog,
+  defaultMessage,
+}: {
+  error: Error | unknown
+  defaultMessage: string
+  errorLog: ErrorLog
+  repo: string
+}) {
+  let errorMessage: string
+  if (error instanceof Error) {
+    errorMessage = error.message
+  } else {
+    errorMessage = defaultMessage
+  }
+  errorLog[repo] = errorMessage
+  logger.error(errorMessage)
+}
+
+function displayErrors(errorLog: ErrorLog, title: string) {
+  const reposWithErrors = Object.keys(errorLog)
+  if (reposWithErrors.length > 0) {
+    logger.error(`${title}`)
+    logger.error(`${reposWithErrors.length} repos with errors:`)
+    for (const repo of reposWithErrors) {
+      logger.error(`- ${repo}: ${errorLog[repo]}`)
+    }
+  }
+}
+
 async function run({
-  isDryRun,
+  isPushBranches,
   distributionYamlPath,
   reposYamlPath,
   srcCodePath,
   outDirectoryPath,
 }: {
-  isDryRun: boolean
+  isPushBranches: boolean
   distributionYamlPath: string
   reposYamlPath: string
   srcCodePath: string
@@ -59,6 +100,9 @@ async function run({
   const newBranch = 'humble'
   const checkBranch = 'galactic'
 
+  const setRepoErrors: ErrorLog = {}
+  const setDistroErrors: ErrorLog = {}
+  const pushBranchesError: ErrorLog = {}
   for (const repo of Object.keys(repos)) {
     const repoPath = getRepoPath(outSrcCodePath, repos, repo)
     if (await hasBranch(repoPath, RegExp(checkBranch))) {
@@ -72,30 +116,35 @@ async function run({
 
       try {
         repos = setRepoVersion(repos, repo, newBranch)
-      } catch (e) {
-        logger.error(
-          "Failed to set version for repo '%s' in ros2.repos file",
+      } catch (error) {
+        recordError({
+          error,
+          defaultMessage: `Failed to set version for repo '${repo}' in ros2.repos file`,
+          errorLog: setRepoErrors,
           repo,
-        )
+        })
       }
       try {
         distribution = setDistributionVersion(distribution, repo, newBranch)
-      } catch (e) {
-        logger.error(
-          "Failed to set version for repo '%s' in distribution file",
+      } catch (error) {
+        recordError({
+          error,
+          defaultMessage: `Failed to set version for repo '${repo}' in distribution file`,
+          errorLog: setDistroErrors,
           repo,
-        )
+        })
       }
-      if (!isDryRun) {
+      if (isPushBranches) {
         try {
           await push(repoPath, newBranch)
           logger.debug(`Pushed branch '${newBranch}' to ${repoPath}`)
-        } catch (e) {
-          logger.error(
-            "Failed to push branch '%s' to repo '%s'",
-            newBranch,
+        } catch (error) {
+          recordError({
+            error,
+            defaultMessage: `Failed to push branch '${newBranch}' to repo '${repo}'`,
+            errorLog: pushBranchesError,
             repo,
-          )
+          })
         }
       }
     } else {
@@ -110,17 +159,82 @@ async function run({
     distributionYamlSavePath,
     yaml.dump(distribution, {noArrayIndent: true}),
   )
-  logger.info(`Done! - created files in ${outDirectoryPath}`)
+
+  displayErrors(setRepoErrors, 'Repo set version errors')
+  displayErrors(setDistroErrors, 'Distribution set version errors')
+  displayErrors(pushBranchesError, 'Branch push errors')
+  if (
+    Object.keys(setRepoErrors).length > 0 ||
+    Object.keys(setDistroErrors).length > 0 ||
+    Object.keys(pushBranchesError).length > 0
+  ) {
+    logger.info(`Finished with errors - created files in ${outDirectoryPath}`)
+  } else {
+    logger.info(
+      `Finished without errors! - created files in ${outDirectoryPath}`,
+    )
+  }
+}
+
+class Cli {
+  rootCommand: Command
+  constructor() {
+    this.rootCommand = new Command()
+      .name(packageJson.name)
+      .description(packageJson.description)
+      .version(packageJson.version)
+      .showHelpAfterError('(add --help for additional information)')
+      .showSuggestionAfterError(true)
+      .allowExcessArguments(false)
+
+    this.rootCommand
+      .command('run')
+      .option(
+        '--push-branches',
+        'Push the created branches in the ros2.repos repositories',
+        false,
+      )
+      .option(
+        '--distribution-yaml-path <path>',
+        'Path to distribution.yaml',
+        DEFAULT_DISTRIBUTION_YAML_PATH,
+      )
+      .option(
+        '--repos-yaml-path <path>',
+        'Path to ros2.repos',
+        DEFAULT_REPOS_YAML_PATH,
+      )
+      .option(
+        '--src-code-path <path>',
+        'Path to src code',
+        DEFAULT_SRC_CODE_PATH,
+      )
+      .option(
+        '--out-directory-path <path>',
+        'Path to output directory',
+        DEFAULT_OUT_DIRECTORY_PATH,
+      )
+      .action(async (options) => {
+        await run({
+          isPushBranches: options.pushBranches,
+          distributionYamlPath: options.distributionYamlPath,
+          reposYamlPath: options.reposYamlPath,
+          srcCodePath: options.srcCodePath,
+          outDirectoryPath: options.outDirectoryPath,
+        })
+      })
+  }
+  process() {
+    this.rootCommand.parse(process.argv)
+    if (this.rootCommand.args.length === 0) {
+      this.rootCommand.help()
+    }
+  }
 }
 
 async function main() {
-  await run({
-    isDryRun: true,
-    distributionYamlPath: DISTRIBUTION_YAML_PATH,
-    reposYamlPath: REPOS_YAML_PATH,
-    srcCodePath: SRC_CODE_PATH,
-    outDirectoryPath: OUT_DIRECTORY_PATH,
-  })
+  const cli = new Cli()
+  cli.process()
 }
 
 main()
