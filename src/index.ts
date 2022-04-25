@@ -97,58 +97,70 @@ async function run({
   logger.debug(`Copying ${srcCodePath} to ${outDirectoryPath}`)
   copySync(srcCodePath, outSrcCodePath)
 
-  const newBranch = 'humble'
-  const checkBranch = 'galactic'
+  const branchPairs = [
+    {
+      findBranch: 'galactic',
+      replaceBranch: 'humble',
+    },
+    {
+      findBranch: 'galactic-devel',
+      replaceBranch: 'humble-devel',
+    },
+  ]
 
   const setRepoErrors: ErrorLog = {}
   const setDistroErrors: ErrorLog = {}
   const pushBranchesError: ErrorLog = {}
-  for (const repo of Object.keys(repos)) {
-    const repoPath = getRepoPath(outSrcCodePath, repos, repo)
-    if (await hasBranch(repoPath, RegExp(checkBranch))) {
-      if (!(await hasBranch(repoPath, RegExp(newBranch)))) {
-        const repoVersion = getRepo(repos, repo).version
-        await checkoutBranch(repoPath, newBranch, repoVersion)
-        logger.debug(`Checked out ${repo}@${repoVersion}`)
-      } else {
-        logger.debug(`Branch '${newBranch}' already exists in ${repoPath}`)
-      }
+  for (const branches of branchPairs) {
+    const newBranch = branches.replaceBranch
+    const checkBranch = branches.findBranch
+    for (const repo of Object.keys(repos)) {
+      const repoPath = getRepoPath(outSrcCodePath, repos, repo)
+      if (await hasBranch(repoPath, RegExp('/' + checkBranch + '$'))) {
+        if (!(await hasBranch(repoPath, RegExp('/' + newBranch + '$')))) {
+          const repoVersion = getRepo(repos, repo).version
+          await checkoutBranch(repoPath, newBranch, repoVersion)
+          logger.debug(`Checked out ${repo}@${repoVersion}`)
+        } else {
+          logger.debug(`Branch '${newBranch}' already exists in ${repoPath}`)
+        }
 
-      try {
-        repos = setRepoVersion(repos, repo, newBranch)
-      } catch (error) {
-        recordError({
-          error,
-          defaultMessage: `Failed to set version for repo '${repo}' in ros2.repos file`,
-          errorLog: setRepoErrors,
-          repo,
-        })
-      }
-      try {
-        distribution = setDistributionVersion(distribution, repo, newBranch)
-      } catch (error) {
-        recordError({
-          error,
-          defaultMessage: `Failed to set version for repo '${repo}' in distribution file`,
-          errorLog: setDistroErrors,
-          repo,
-        })
-      }
-      if (isPushBranches) {
         try {
-          await push(repoPath, newBranch)
-          logger.debug(`Pushed branch '${newBranch}' to ${repoPath}`)
+          repos = setRepoVersion(repos, repo, newBranch)
         } catch (error) {
           recordError({
             error,
-            defaultMessage: `Failed to push branch '${newBranch}' to repo '${repo}'`,
-            errorLog: pushBranchesError,
+            defaultMessage: `Failed to set version for repo '${repo}' in ros2.repos file`,
+            errorLog: setRepoErrors,
             repo,
           })
         }
+        try {
+          distribution = setDistributionVersion(distribution, repo, newBranch)
+        } catch (error) {
+          recordError({
+            error,
+            defaultMessage: `Failed to set version for repo '${repo}' in distribution file`,
+            errorLog: setDistroErrors,
+            repo,
+          })
+        }
+        if (isPushBranches) {
+          try {
+            await push(repoPath, newBranch)
+            logger.debug(`Pushed branch '${newBranch}' to ${repoPath}`)
+          } catch (error) {
+            recordError({
+              error,
+              defaultMessage: `Failed to push branch '${newBranch}' to repo '${repo}'`,
+              errorLog: pushBranchesError,
+              repo,
+            })
+          }
+        }
+      } else {
+        logger.debug(`No branch '${checkBranch}' found in ${repoPath}`)
       }
-    } else {
-      logger.debug(`No branch '${checkBranch}' found in ${repoPath}`)
     }
   }
   const reposFile = reposToReposFile(repos)
