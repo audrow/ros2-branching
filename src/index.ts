@@ -60,10 +60,10 @@ function recordError({
 function displayErrors(errorLog: ErrorLog, title: string) {
   const reposWithErrors = Object.keys(errorLog)
   if (reposWithErrors.length > 0) {
-    logger.error(`${title}`)
-    logger.error(`${reposWithErrors.length} repos with errors:`)
+    console.error(`${title}`)
+    console.error(`${reposWithErrors.length} repos with errors:`)
     for (const repo of reposWithErrors) {
-      logger.error(`- ${repo}: ${errorLog[repo]}`)
+      console.error(`- ${repo}`)
     }
   }
 }
@@ -99,12 +99,8 @@ async function run({
 
   const branchPairs = [
     {
-      findBranch: 'galactic',
+      findBranch: '(.*-devel|master)',
       replaceBranch: 'humble',
-    },
-    {
-      findBranch: 'galactic-devel',
-      replaceBranch: 'humble-devel',
     },
   ]
 
@@ -117,10 +113,12 @@ async function run({
     for (const repo of Object.keys(repos)) {
       const repoPath = getRepoPath(outSrcCodePath, repos, repo)
       if (await hasBranch(repoPath, RegExp('/' + checkBranch + '$'))) {
+        let isUpdatedBranch = false
         if (!(await hasBranch(repoPath, RegExp('/' + newBranch + '$')))) {
           const repoVersion = getRepo(repos, repo).version
           await checkoutBranch(repoPath, newBranch, repoVersion)
           logger.debug(`Checked out ${repo}@${repoVersion}`)
+          isUpdatedBranch = true
         } else {
           logger.debug(`Branch '${newBranch}' already exists in ${repoPath}`)
         }
@@ -145,7 +143,7 @@ async function run({
             repo,
           })
         }
-        if (isPushBranches) {
+        if (isPushBranches && isUpdatedBranch) {
           try {
             await push(repoPath, newBranch)
             logger.debug(`Pushed branch '${newBranch}' to ${repoPath}`)
