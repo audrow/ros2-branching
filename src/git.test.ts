@@ -25,7 +25,7 @@ describe('git', () => {
     expect(await hasBranch(path, RegExp('not-a-branch'))).toBeFalsy()
   })
   it('creates a new branch', async () => {
-    const newBranch = 'humble'
+    const newBranch = 'my-new-branch'
     const baseBranch = 'master'
     expect(await hasBranch(path, RegExp('galactic'))).toBeTruthy()
     expect(await hasBranch(path, RegExp(baseBranch))).toBeTruthy()
