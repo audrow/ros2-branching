@@ -61,7 +61,7 @@
     "commander": "^9.2.0",
     "fs-extra": "^10.1.0",
     "js-yaml": "^4.1.0",
-    "pino": "^7.10.0",
+    "pino": "^7.11.0",
     "pino-pretty": "^7.6.1",
     "simple-git": "^3.7.1",
     "temp-fs": "^0.9.9"
