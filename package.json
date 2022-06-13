@@ -37,7 +37,7 @@
     "url": "https://github.com/audrow/node-js-template/issues"
   },
   "devDependencies": {
-    "@tsconfig/node16": "^1.0.2",
+    "@tsconfig/node16": "^1.0.3",
     "@types/jest": "^27.5.0",
     "@types/js-yaml": "^4.0.5",
     "@types/proper-url-join": "^2.1.1",
