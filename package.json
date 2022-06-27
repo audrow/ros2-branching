@@ -63,7 +63,7 @@
     "js-yaml": "^4.1.0",
     "pino": "^8.1.0",
     "pino-pretty": "^8.1.0",
-    "simple-git": "^3.9.0",
+    "simple-git": "^3.10.0",
     "temp-fs": "^0.9.9"
   }
 }
